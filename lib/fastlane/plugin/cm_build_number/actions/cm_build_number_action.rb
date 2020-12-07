@@ -33,7 +33,7 @@ module Fastlane
         UI.message 'set build number to xcode project'
         require 'fastlane/actions/increment_build_number'
         require 'fastlane/helper/sh_helper'
-        Fastlane::Actions::IncrementBuildNumberAction.run(build_number: @build_number)
+        Fastlane::Actions::IncrementBuildNumberAction.run(build_number: @build_number, xcodeproj: "./imaygou/imaygou.xcodeproj")
       end
 
       def self.generate_git_commit_number!(format)
