@@ -3,43 +3,86 @@ require_relative '../helper/cm_build_number_helper'
 
 module Fastlane
   module Actions
+    module SharedValues
+      HUMANABLE_BUILD_NUMBER = :HUMANABLE_BUILD_NUMBER
+    end
+
     class CmBuildNumberAction < Action
       def self.run(params)
-        UI.message("The cm_build_number plugin is working!")
+        if GetBuildNumberRepositoryAction.is_git?
+          generate_git_commit_number!(params[:date_format])
+          UI.message 'humanable detect: git'
+        else
+          UI.message 'humanable detect: current datetime'
+          generate_build_number!(params[:date_format])
+        end
+
+        UI.message "humanable build number: #{@build_number.green}"
+
+        set_humanable_build_number! if params[:update]
+        @build_number
+      end
+
+      def self.set_humanable_build_number!
+        unless Helper::CmBuildNumberHelper.ios_project?
+          UI.important "Can not set build number for android project"
+          UI.important Helper::CmBuildNumberHelper.set_build_number_for_android_tips
+          return
+        end
+
+        UI.message 'set build number to xcode project'
+        require 'fastlane/actions/increment_build_number'
+        require 'fastlane/helper/sh_helper'
+        Fastlane::Actions::IncrementBuildNumberAction.run(build_number: @build_number)
+      end
+
+      def self.generate_git_commit_number!(format)
+        git_last_commit_datetime = Actions.last_git_commit_formatted_with('%ci')
+        @build_number = Helper::CmBuildNumberHelper.cook_humanable(git_last_commit_datetime, format: format)
+      end
+
+      def self.generate_build_number!(format)
+        @build_number = Helper::CmBuildNumberHelper.cook_humanable(format: format)
       end
 
       def self.description
-        "cm_build_number"
+        "Automatic generate app build number unque and human readable friendly, like yymmHHMM. both support iOS and Android."
       end
 
       def self.authors
-        ["王胜峰-公司"]
+        ["icyleaf <icyleaf.cn@gmail.com>"]
+      end
+
+      def self.output
+        [
+          [SharedValues::HUMANABLE_BUILD_NUMBER.to_s, 'The humanable build number, like `yymmddHHMM`']
+        ]
       end
 
       def self.return_value
-        # If your method provides a return value, you can describe here what it does
+        'The humanable build number'
       end
 
       def self.details
-        # Optional:
-        ""
+        "The default will using the datetime of git last commit, but else the datetime of build and formatted to yymmHHMM. "
       end
 
       def self.available_options
         [
-          # FastlaneCore::ConfigItem.new(key: :your_option,
-          #                         env_name: "CM_BUILD_NUMBER_YOUR_OPTION",
-          #                      description: "A description of your option",
-          #                         optional: false,
-          #                             type: String)
+          FastlaneCore::ConfigItem.new(key: :update,
+                                       env_name: 'HUMANABLE_UPDATE',
+                                       description: 'Set the build number to xcode configuration file',
+                                       default_value: true,
+                                       is_string: false),
+          FastlaneCore::ConfigItem.new(key: :date_format,
+                                       env_name: 'HUMANABLE_DATE_FORMAT',
+                                       description: 'Set formatter of build_number',
+                                       default_value: '%Y%m%d%H%M',
+                                       is_string: true)
         ]
       end
 
       def self.is_supported?(platform)
-        # Adjust this if your plugin only works for a particular platform (iOS vs. Android, for example)
-        # See: https://docs.fastlane.tools/advanced/#control-configuration-by-lane-and-by-platform
-        #
-        # [:ios, :mac, :android].include?(platform)
         true
       end
     end
